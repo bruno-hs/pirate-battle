@@ -12,11 +12,18 @@ function App() {
     const app = new Application()
 
     let isMounted = true
+    let isAppInitialized = false
 
     const keys: Record<string, boolean> = {}
 
     const handleKeyDown = (event: KeyboardEvent) => {
       keys[event.code] = true
+
+      if (
+        event.code === 'Space'
+      ) {
+        event.preventDefault()
+      }
 
       if (
         event.code === 'ArrowUp' ||
@@ -43,12 +50,17 @@ function App() {
         antialias: true,
       })
 
+      isAppInitialized = true
+
       if (!isMounted || !gameContainerRef.current) {
-        app.destroy(true, true)
+        app.destroy(true, {
+          children: true,
+        })
+
         return
       }
 
-      gameContainerRef.current.appendChild(app.canvas)
+      gameContainerRef.current.replaceChildren(app.canvas)
 
       const arena = new Graphics
 
@@ -72,6 +84,89 @@ function App() {
       ship.scale.set(0.4)
 
       app.stage.addChild(ship)
+
+      const projectiles: {
+        graphic: Graphics,
+        velocityX: number
+        velocityY: number
+      } [] = []
+
+      const projectileSpeed = 10
+      const projectileCoolDown = 300
+
+      let lastShotTime = 0
+
+      const shoot = () => {
+        const now = Date.now()
+
+        if (now - lastShotTime < projectileCoolDown) {
+          return
+        }
+
+        lastShotTime = now
+
+        const projectile = new Graphics()
+
+        projectile.circle(0, 0, 6).fill('#f5d742')
+
+        const angle = ship.rotation + Math.PI / 2
+
+        const spawnDistance = 25
+
+        projectile.x = ship.x + Math.cos(angle) * spawnDistance
+        projectile.y = ship.y + Math.sin(angle) * spawnDistance
+
+        const velocityX = Math.cos(angle) * projectileSpeed
+
+        const velocityY = Math.sin(angle) * projectileSpeed
+
+        app.stage.addChild(projectile)
+
+        projectiles.push({
+          graphic: projectile,
+          velocityX,
+          velocityY,
+        })
+      }
+
+      const shootBroadside = (side: 'left' | 'right') => {
+        const now = Date.now()
+
+        if (now - lastShotTime < projectileCoolDown) {
+          return
+        }
+
+        lastShotTime = now
+
+        const forwardAngle = ship.rotation + Math.PI / 2
+
+        const sideAngle = side === 'left' ? forwardAngle - Math.PI / 2 : forwardAngle + Math.PI / 2
+
+        const spacing = 18
+        const spawnDistance = 20
+
+        for (let i = -1; i <= 1; i++) {
+          const projectile = new Graphics()
+
+          projectile.circle(0, 0, 6).fill('#f5d742')
+
+          projectile.x = ship.x + Math.cos(forwardAngle) * (i * spacing) + Math.cos(sideAngle) * spawnDistance
+
+          projectile.y = ship.y + Math.sin(forwardAngle) * (i * spacing) + Math.sin(sideAngle) * spawnDistance
+
+          const velocityX = Math.cos(sideAngle) * projectileSpeed
+
+          const velocityY = Math.sin(sideAngle) * projectileSpeed
+
+          app.stage.addChild(projectile)
+
+          projectiles.push({
+            graphic: projectile,
+            velocityX,
+            velocityY,
+          })
+        }
+      }
 
       const speed = 4
       const rotationSpeed = 0.05
@@ -105,6 +200,39 @@ function App() {
           ship.y -= Math.sin(movementAngle) * speed * ticker.deltaTime
         }
 
+        if (keys['Space']) {
+          shoot()
+        }
+
+        if (keys['KeyQ']) {
+          shootBroadside('left')
+        }
+
+        if (keys['KeyE']) {
+          shootBroadside('right')
+        }
+
+        for (let i = projectiles.length - 1; i >= 0; i--) {
+          const projectile = projectiles[i]
+
+          projectile.graphic.x += projectile.velocityX * ticker.deltaTime
+
+          projectile.graphic.y += projectile.velocityY * ticker.deltaTime
+
+          const isOutSideArena =
+            projectile.graphic.x < 0 ||
+            projectile.graphic.x > app.screen.width ||
+            projectile.graphic.y < 0 ||
+            projectile.graphic.y > app.screen.height
+
+            if (isOutSideArena) {
+              app.stage.removeChild(projectile.graphic)
+              projectile.graphic.destroy()
+
+              projectiles.splice(i, 1)
+            }
+        }
+
         const margin = 30
 
         ship.x = Math.max(
@@ -124,8 +252,14 @@ function App() {
     return () => {
       isMounted = false
 
-      window.addEventListener('keydown', handleKeyDown)
-      window.addEventListener('keyup', handleKeyUp)
+      window.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('keyup', handleKeyUp)
+
+      if (isAppInitialized) {
+        app.destroy(true, {
+          children: true,
+        })
+      }
     }
   }, [])
 
