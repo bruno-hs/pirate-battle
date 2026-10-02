@@ -3,6 +3,7 @@ import { Application, Assets, Graphics, Sprite, } from 'pixi.js'
 
 import shipImage from '../assets/png/retina/ships/ship_1.png'
 import enemyShipImage from '../assets/png/retina/ships/ship_2.png'
+import shooterShipImage from '../assets/png/retina/ships/ship_3.png'
 
 import './App.css'
 
@@ -75,6 +76,7 @@ function App() {
 
       const shipTexture = await Assets.load(shipImage)
       const enemyShipTexture = await Assets.load(enemyShipImage)
+      const shooterShipTexture = await Assets.load(shooterShipImage)
 
       if (!isMounted) {
         return
@@ -104,14 +106,38 @@ function App() {
 
       const chaserSpeed = 2
 
+      const shooter = new Sprite(shooterShipTexture)
+
+      shooter.anchor.set(0.5)
+
+      shooter.x = app.screen.width - 150
+      shooter.y = 150
+
+      shooter.scale.set(0.4)
+
+      app.stage.addChild(shooter)
+
+      const shooterSpeed = 1.5
+      const shooterRange = 300
+      const shooterProjectileSpeed = 6
+      const shooterCoolDown = 1200
+
+      let lastShooterShotTime = 0
+
       const projectiles: {
         graphic: Graphics,
         velocityX: number
         velocityY: number
-      } [] = []
+      }[] = []
 
       const projectileSpeed = 10
       const projectileCoolDown = 300
+
+      const enemyProjectiles: {
+        graphic: Graphics
+        velocityX: number
+        velocityY: number
+      }[] = []
 
       let lastShotTime = 0
 
@@ -190,6 +216,43 @@ function App() {
       const speed = 4
       const rotationSpeed = 0.05
 
+      const shooterShoot = () => {
+        const now = Date.now()
+
+        if (now - lastShooterShotTime < shooterCoolDown) {
+          return
+        }
+
+        lastShooterShotTime = now
+
+        const projectile = new Graphics()
+
+        projectile.circle(0, 0, 6).fill('#ff4d4d')
+
+        const angle = Math.atan2(
+          ship.y - shooter.y,
+          ship.x - shooter.x,
+        )
+
+        const spawnDistance = 25
+
+        projectile.x = shooter.x + Math.cos(angle) * spawnDistance
+
+        projectile.y = shooter.y + Math.sin(angle) * spawnDistance
+
+        const velocityX = Math.cos(angle) * shooterProjectileSpeed
+
+        const velocityY = Math.sin(angle) * shooterProjectileSpeed
+
+        app.stage.addChild(projectile)
+
+        enemyProjectiles.push({
+          graphic: projectile,
+          velocityX,
+          velocityY,
+        })
+      }
+
       app.ticker.add((ticker) => {
         const movingForward = keys['KeyW'] || keys['ArrowUp']
 
@@ -248,17 +311,52 @@ function App() {
           chaser.visible && distance < collisionDistance
         ) {
           setHealth((currentHealth) => {
-            return Math.max(0, currentHealth -25)
+            return Math.max(0, currentHealth - 25)
           })
 
           chaser.visible = false
 
           setTimeout(() => {
             chaser.x = 100 + Math.random() * (app.screen.width - 200)
-            chaser.y = 100 + Math.random() * (app.screen.width - 200)
+            chaser.y = 100 + Math.random() * (app.screen.height - 200)
 
             chaser.visible = true
           }, 2000)
+        }
+
+        const shooterDeltaX = ship.x - shooter.x
+
+        const shooterDeltaY = ship.y - shooter.y
+
+        const shooterDistance = Math.sqrt(
+          shooterDeltaX * shooterDeltaX +
+          shooterDeltaY * shooterDeltaY,
+        )
+
+        const shooterAngle = Math.atan2(
+          shooterDeltaY,
+          shooterDeltaX,
+        )
+
+        shooter.rotation = shooterAngle - Math.PI / 2
+
+        if (
+          shooter.visible &&
+          shooterDistance > shooterRange
+        ) {
+          const shooterDirectionX = shooterDeltaX / shooterDistance
+
+          const shooterDirectionY = shooterDeltaY / shooterDistance
+
+          shooter.x += shooterDirectionX * shooterSpeed * ticker.deltaTime
+
+          shooter.y += shooterDirectionY * shooterSpeed * ticker.deltaTime
+        }
+
+        if (
+          shooter.visible && shooterDistance <= shooterRange
+        ) {
+          shooterShoot()
         }
 
         if (keys['Space']) {
@@ -283,7 +381,7 @@ function App() {
           const projectileDeltaX = chaser.x - projectile.graphic.x
 
           const projectileDeltaY = chaser.y - projectile.graphic.y
-          
+
           const projectileDistance = Math.sqrt(
             projectileDeltaX * projectileDeltaX +
             projectileDeltaY * projectileDeltaY,
@@ -304,11 +402,42 @@ function App() {
             setScore((currentScore) => currentScore + 1)
 
             setTimeout(() => {
-              chaser.x = 100 + Math.random() * (app.screen.width -200)
+              chaser.x = 100 + Math.random() * (app.screen.width - 200)
 
               chaser.y = 100 + Math.random() * (app.screen.height - 200)
 
               chaser.visible = true
+            }, 2000)
+
+            continue
+          }
+
+          const shooterProjectileDeltaX = shooter.x - projectile.graphic.x
+
+          const shooterProjectileDeltaY = shooter.y - projectile.graphic.y
+
+          const shooterProjectileDistance = Math.sqrt(
+            shooterProjectileDeltaX * shooterProjectileDeltaX +
+            shooterProjectileDeltaY * shooterProjectileDeltaY,
+          )
+
+          if (
+            shooter.visible &&
+            shooterProjectileDistance < projectileCollisionDistance
+          ) {
+            shooter.visible = false
+
+            app.stage.removeChild(projectile.graphic)
+            projectile.graphic.destroy()
+            
+            projectiles.splice(i, 1)
+
+            setTimeout(() => {
+              shooter.x = 100 + Math.random() * (app.screen.width - 200)
+
+              shooter.y = 100 + Math.random() * (app.screen.height - 200)
+
+              shooter.visible = true
             }, 2000)
 
             continue
@@ -322,11 +451,58 @@ function App() {
             projectile.graphic.y < -projectileMargin ||
             projectile.graphic.y > app.screen.height + projectileMargin
 
-            if (isOutSideArena) {
+          if (isOutSideArena) {
+            app.stage.removeChild(projectile.graphic)
+            projectile.graphic.destroy()
+
+            projectiles.splice(i, 1)
+          }
+        }
+
+        for (let i = enemyProjectiles.length - 1; i >= 0; i--) {
+          const projectile = enemyProjectiles[i]
+
+          projectile.graphic.x += projectile.velocityX * ticker.deltaTime
+
+          projectile.graphic.y += projectile.velocityY * ticker.deltaTime
+
+          const deltaX = ship.x - projectile.graphic.x
+
+          const deltaY = ship.y - projectile.graphic.y
+
+          const disanceToPlayer = Math.sqrt(
+            deltaX * deltaX +
+            deltaY * deltaY,
+          )
+
+          const hitDistance = 30
+
+          if (disanceToPlayer < hitDistance) {
+            setHealth((currentHealth) =>
+              Math.max(0, currentHealth - 10),
+            )
+
+            app.stage.removeChild(projectile.graphic)
+            projectile.graphic.destroy()
+
+            enemyProjectiles.splice(i, 1)
+
+            continue
+          }
+
+          const projectileMargin = 20
+
+          const isOutSideArena = 
+            projectile.graphic.x < -projectileMargin ||
+            projectile.graphic.x > app.screen.width + projectileMargin ||
+            projectile.graphic.y < -projectileMargin ||
+            projectile.graphic.y > app.screen.height + projectileMargin
+
+            if(isOutSideArena) {
               app.stage.removeChild(projectile.graphic)
               projectile.graphic.destroy()
-
-              projectiles.splice(i, 1)
+              
+              enemyProjectiles.splice(i, 1)
             }
         }
 
