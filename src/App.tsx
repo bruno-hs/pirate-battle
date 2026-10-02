@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useEffectEvent, useRef, useState } from "react"
 import { Application, Assets, Graphics, Sprite, } from 'pixi.js'
 
 import shipImage from '../assets/png/retina/ships/ship_1.png'
@@ -11,8 +11,49 @@ function App() {
   const gameContainerRef = useRef<HTMLDivElement>(null)
 
   const [health, setHealth] = useState(100)
-
   const [score, setScore] = useState(0)
+  const [timeLeft, setTimeLeft] = useState(60)
+  const [gameOver, setGameOver] = useState(false)
+  const [isPaused, setIsPaused] = useState(false)
+  const [endReason, setEndReason] = useState<'time' | 'death' | null>(null)
+
+  const gameOverRef = useRef(false)
+  const isPausedRef = useRef(false)
+
+  useEffect(() => {
+    gameOverRef.current = gameOver
+  }, [gameOver])
+
+  useEffect(() => {
+    isPausedRef.current = isPaused
+  }, [isPaused])
+
+  useEffect(() => {
+    if (gameOver || isPaused) {
+      return
+    }
+
+    const timer = setInterval(() => {
+      setTimeLeft((currentTime) => {
+        if (currentTime <= 1) {
+          setEndReason('time')
+          setGameOver(true)
+          return 0
+        }
+
+        return currentTime - 1
+      })
+    }, 1000)
+
+    return () => clearInterval(timer)
+  }, [gameOver, isPaused])
+
+  useEffect(() => {
+    if (health <= 0) {
+      setEndReason('death')
+      setGameOver(true)
+    }
+  }, [health])
 
   useEffect(() => {
     const app = new Application()
@@ -24,6 +65,11 @@ function App() {
 
     const handleKeyDown = (event: KeyboardEvent) => {
       keys[event.code] = true
+
+      if (event.code === 'Escape') {
+        setIsPaused((current) => !current)
+        return
+      }
 
       if (
         event.code === 'Space'
@@ -254,6 +300,13 @@ function App() {
       }
 
       app.ticker.add((ticker) => {
+        if (
+          gameOverRef.current ||
+          isPausedRef.current
+        ) {
+          return
+        }
+
         const movingForward = keys['KeyW'] || keys['ArrowUp']
 
         const movingBackward = keys['KeyS'] || keys['ArrowDown']
@@ -429,7 +482,7 @@ function App() {
 
             app.stage.removeChild(projectile.graphic)
             projectile.graphic.destroy()
-            
+
             projectiles.splice(i, 1)
 
             setTimeout(() => {
@@ -492,18 +545,18 @@ function App() {
 
           const projectileMargin = 20
 
-          const isOutSideArena = 
+          const isOutSideArena =
             projectile.graphic.x < -projectileMargin ||
             projectile.graphic.x > app.screen.width + projectileMargin ||
             projectile.graphic.y < -projectileMargin ||
             projectile.graphic.y > app.screen.height + projectileMargin
 
-            if(isOutSideArena) {
-              app.stage.removeChild(projectile.graphic)
-              projectile.graphic.destroy()
-              
-              enemyProjectiles.splice(i, 1)
-            }
+          if (isOutSideArena) {
+            app.stage.removeChild(projectile.graphic)
+            projectile.graphic.destroy()
+
+            enemyProjectiles.splice(i, 1)
+          }
         }
 
         const margin = 30
@@ -538,7 +591,35 @@ function App() {
 
   return (
     <main className="game-page">
-      <div className="hud">HP: {health} | SCORE: {score}</div>
+      <div className="hud">HP: {health} | SCORE: {score} | TIME: {timeLeft}</div>
+
+      {isPaused && !gameOver && (
+        <div className="game-over">
+          <h2>Paused</h2>
+
+          <p>Press ESC to continue</p>
+        </div>
+      )}
+
+      {gameOver && (
+        <div className="game-over">
+          <h2>
+            {endReason === 'death'
+              ? 'Defeated'
+              : 'Time Up'}
+          </h2>
+
+          <p>Score: {score}</p>
+
+          <p>
+            {endReason === 'death'
+              ? 'Your ship was destroyed.'
+              : 'You survived until the end of the match.'}
+          </p>
+
+          <button onClick={() => window.location.reload()}>Play Again</button>
+        </div>
+      )}
 
       <div ref={gameContainerRef} className="game-container" />
     </main>

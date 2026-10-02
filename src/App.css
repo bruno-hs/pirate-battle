@@ -34,3 +34,21 @@
   height: 100%;
   width: 100%;
 }
+
+.game-over {
+  inset: 0;
+  display: flex;
+  z-index: 20px;
+  color: white;
+  position: absolute;
+  align-items: center;
+  flex-direction: column;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.75);
+}
+
+.game-over button {
+  cursor: pointer;
+  font-size: 18px;
+  padding: 12px 20px;
+}
