@@ -1,12 +1,17 @@
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Application, Assets, Graphics, Sprite, } from 'pixi.js'
 
 import shipImage from '../assets/png/retina/ships/ship_1.png'
+import enemyShipImage from '../assets/png/retina/ships/ship_2.png'
 
 import './App.css'
 
 function App() {
   const gameContainerRef = useRef<HTMLDivElement>(null)
+
+  const [health, setHealth] = useState(100)
+
+  const [score, setScore] = useState(0)
 
   useEffect(() => {
     const app = new Application()
@@ -69,6 +74,7 @@ function App() {
       app.stage.addChild(arena)
 
       const shipTexture = await Assets.load(shipImage)
+      const enemyShipTexture = await Assets.load(enemyShipImage)
 
       if (!isMounted) {
         return
@@ -84,6 +90,19 @@ function App() {
       ship.scale.set(0.4)
 
       app.stage.addChild(ship)
+
+      const chaser = new Sprite(enemyShipTexture)
+
+      chaser.anchor.set(0.5)
+
+      chaser.x = 150
+      chaser.y = 150
+
+      chaser.scale.set(0.4)
+
+      app.stage.addChild(chaser)
+
+      const chaserSpeed = 2
 
       const projectiles: {
         graphic: Graphics,
@@ -200,6 +219,48 @@ function App() {
           ship.y -= Math.sin(movementAngle) * speed * ticker.deltaTime
         }
 
+        const deltaX = ship.x - chaser.x
+        const deltaY = ship.y - chaser.y
+
+        const distance = Math.sqrt(
+          deltaX * deltaX + deltaY * deltaY,
+        )
+
+        if (
+          chaser.visible && distance > 0
+        ) {
+          const directionX = deltaX / distance
+
+          const directionY = deltaY / distance
+
+          chaser.x += directionX * chaserSpeed * ticker.deltaTime
+
+          chaser.y += directionY * chaserSpeed * ticker.deltaTime
+
+          const chaserAngle = Math.atan2(deltaY, deltaX)
+
+          chaser.rotation = chaserAngle - Math.PI / 2
+        }
+
+        const collisionDistance = 45
+
+        if (
+          chaser.visible && distance < collisionDistance
+        ) {
+          setHealth((currentHealth) => {
+            return Math.max(0, currentHealth -25)
+          })
+
+          chaser.visible = false
+
+          setTimeout(() => {
+            chaser.x = 100 + Math.random() * (app.screen.width - 200)
+            chaser.y = 100 + Math.random() * (app.screen.width - 200)
+
+            chaser.visible = true
+          }, 2000)
+        }
+
         if (keys['Space']) {
           shoot()
         }
@@ -219,11 +280,47 @@ function App() {
 
           projectile.graphic.y += projectile.velocityY * ticker.deltaTime
 
+          const projectileDeltaX = chaser.x - projectile.graphic.x
+
+          const projectileDeltaY = chaser.y - projectile.graphic.y
+          
+          const projectileDistance = Math.sqrt(
+            projectileDeltaX * projectileDeltaX +
+            projectileDeltaY * projectileDeltaY,
+          )
+
+          const projectileCollisionDistance = 35
+
+          if (
+            chaser.visible && projectileDistance < projectileCollisionDistance
+          ) {
+            chaser.visible = false
+
+            app.stage.removeChild(projectile.graphic)
+            projectile.graphic.destroy()
+
+            projectiles.splice(i, 1)
+
+            setScore((currentScore) => currentScore + 1)
+
+            setTimeout(() => {
+              chaser.x = 100 + Math.random() * (app.screen.width -200)
+
+              chaser.y = 100 + Math.random() * (app.screen.height - 200)
+
+              chaser.visible = true
+            }, 2000)
+
+            continue
+          }
+
+          const projectileMargin = 20
+
           const isOutSideArena =
-            projectile.graphic.x < 0 ||
-            projectile.graphic.x > app.screen.width ||
-            projectile.graphic.y < 0 ||
-            projectile.graphic.y > app.screen.height
+            projectile.graphic.x < -projectileMargin ||
+            projectile.graphic.x > app.screen.width + projectileMargin ||
+            projectile.graphic.y < -projectileMargin ||
+            projectile.graphic.y > app.screen.height + projectileMargin
 
             if (isOutSideArena) {
               app.stage.removeChild(projectile.graphic)
@@ -265,6 +362,8 @@ function App() {
 
   return (
     <main className="game-page">
+      <div className="hud">HP: {health} | SCORE: {score}</div>
+
       <div ref={gameContainerRef} className="game-container" />
     </main>
   )

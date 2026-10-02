@@ -7,9 +7,21 @@
   width: 100%;
   display: flex;
   min-height: 100vh;
+  position: relative;
   align-items: center;
   justify-content: center;
   background-color: #071923;
+}
+
+.hud {
+  top: 20px;
+  left: 20px;
+  z-index: 10;
+  color: white;
+  font-size: 20px;
+  font-weight: bold;
+  padding: 10px 16px;
+  position: absolute;
 }
 
 .game-container {
