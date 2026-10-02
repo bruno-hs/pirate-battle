@@ -11,10 +11,6 @@ import './index.css'
 const queryClient = new QueryClient()
 
 async function enableMocking() {
-  if (!import.meta.env.DEV) {
-    return
-  }
-
   try {
     const { worker } = await import('./mocks/browser')
 
