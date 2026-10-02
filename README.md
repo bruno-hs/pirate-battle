@@ -54,7 +54,7 @@ The project was built with React, TypeScript and PixiJS, with mocked API integra
 Clone the repository:
 
 ```bash
-git clone YOUR_REPOSITORY_URL
+git clone https://github.com/bruno-hs/pirate-battle.git
 ```
 
 Enter the project directory:
