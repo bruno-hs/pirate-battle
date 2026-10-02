@@ -16,9 +16,27 @@ function App() {
   const [gameOver, setGameOver] = useState(false)
   const [isPaused, setIsPaused] = useState(false)
   const [endReason, setEndReason] = useState<'time' | 'death' | null>(null)
+  const [gameStarted, setGameStarted] = useState(false)
+  const [showOptions, setShowOptions] = useState(false)
+  const [matchDuration, setMatchDuration] = useState(() => {
+    const saved = localStorage.getItem('matchDuration')
+
+    return saved ? Number(saved) : 60
+  })
+  const [spawnInternal, setSpawnInternal] = useState(() => {
+    const saved = localStorage.getItem('spawnInternal')
+
+    return saved ? Number(saved) : 2000
+  })
 
   const gameOverRef = useRef(false)
   const isPausedRef = useRef(false)
+  const gameStartedRef = useRef(false)
+  const spawnInternalRef = useRef(spawnInternal)
+
+  useEffect(() => {
+    gameStartedRef.current = gameStarted
+  }, [gameStarted])
 
   useEffect(() => {
     gameOverRef.current = gameOver
@@ -29,7 +47,7 @@ function App() {
   }, [isPaused])
 
   useEffect(() => {
-    if (gameOver || isPaused) {
+    if (!gameStarted || gameOver || isPaused) {
       return
     }
 
@@ -46,7 +64,7 @@ function App() {
     }, 1000)
 
     return () => clearInterval(timer)
-  }, [gameOver, isPaused])
+  }, [gameStarted, gameOver, isPaused])
 
   useEffect(() => {
     if (health <= 0) {
@@ -54,6 +72,24 @@ function App() {
       setGameOver(true)
     }
   }, [health])
+
+  useEffect(() => {
+    spawnInternalRef.current = spawnInternal
+  }, [spawnInternal])
+
+  const saveOptions = () => {
+    localStorage.setItem(
+      'matchDuration',
+      String(matchDuration),
+    )
+
+    localStorage.setItem(
+      'spawnInternal',
+      String(spawnInternal)
+    )
+
+    setShowOptions(false)
+  }
 
   useEffect(() => {
     const app = new Application()
@@ -301,6 +337,7 @@ function App() {
 
       app.ticker.add((ticker) => {
         if (
+          !gameStartedRef.current ||
           gameOverRef.current ||
           isPausedRef.current
         ) {
@@ -374,7 +411,7 @@ function App() {
             chaser.y = 100 + Math.random() * (app.screen.height - 200)
 
             chaser.visible = true
-          }, 2000)
+          }, spawnInternalRef.current)
         }
 
         const shooterDeltaX = ship.x - shooter.x
@@ -460,7 +497,7 @@ function App() {
               chaser.y = 100 + Math.random() * (app.screen.height - 200)
 
               chaser.visible = true
-            }, 2000)
+            }, spawnInternalRef.current)
 
             continue
           }
@@ -491,7 +528,7 @@ function App() {
               shooter.y = 100 + Math.random() * (app.screen.height - 200)
 
               shooter.visible = true
-            }, 2000)
+            }, spawnInternalRef.current)
 
             continue
           }
@@ -591,7 +628,63 @@ function App() {
 
   return (
     <main className="game-page">
-      <div className="hud">HP: {health} | SCORE: {score} | TIME: {timeLeft}</div>
+      {!gameStarted && !showOptions && (
+        <div className="main-menu">
+          <h1>Pirate Battle</h1>
+
+          <button onClick={() => {
+            setHealth(100)
+            setScore(0)
+            setTimeLeft(matchDuration)
+            setGameOver(false)
+            setGameStarted(true)
+          }}>
+            Play
+          </button>
+
+          <button onClick={() => {
+            setShowOptions(true)
+          }}>
+            Options
+          </button>
+        </div>
+      )}
+
+      {showOptions && !gameStarted && (
+        <div className="options-menu">
+          <h2>Options</h2>
+
+          <label>
+            Match Duration
+
+            <select value={matchDuration} onChange={(event) => setMatchDuration(Number(event.target.value),)}>
+              <option value={60}>60 seconds</option>
+              <option value={90}>90 seconds</option>
+              <option value={120}>120 seconds</option>
+              <option value={180}>180 seconds</option>
+            </select>
+          </label>
+
+          <label>
+            Enemy Respawn
+
+            <select value={spawnInternal} onChange={(event) => setSpawnInternal(Number(event.target.value))}>
+              <option value={1000}>1 second</option>
+              <option value={2000}>2 second</option>
+              <option value={3000}>3 second</option>
+              <option value={5000}>5 second</option>
+            </select>
+          </label>
+
+          <button onClick={saveOptions}>Save</button>
+          
+          <button onClick={() => setShowOptions(false)}>Back</button>
+        </div>
+      )}
+
+      {gameStarted && (
+        <div className="hud">HP: {health} | SCORE: {score} | TIME: {timeLeft}</div>
+      )}
 
       {isPaused && !gameOver && (
         <div className="game-over">

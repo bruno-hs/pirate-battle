@@ -3,6 +3,63 @@
   min-height: 100vh;
 }
 
+.main-menu {
+  inset: 0;
+  gap: 20px;
+  z-index: 38;
+  display: flex;
+  color: white;
+  position: absolute;
+  align-items: center;
+  flex-direction: column;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.8);
+}
+
+.main-menu h1 {
+  margin: 0;
+  font-size: 48px;
+}
+
+.main-menu button {
+  cursor: pointer;
+  font-size: 20px;
+  padding: 12px 32px;
+}
+
+.options-menu {
+  inset: 0;
+  gap: 20px;
+  z-index: 30;
+  display: flex;
+  color: white;
+  position: absolute;
+  align-items: center;
+  flex-direction: column;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.85);
+}
+
+.option-menu label {
+  gap: 8px;
+  display: flex;
+  font-size: 18px;
+  flex-direction: column;
+}
+
+.options-menu select {
+  padding: 10px;
+  font-size: 16px;
+  min-width: 200px;
+}
+
+.options-menu button {
+  cursor: pointer;
+  font-size: 17px;
+  min-width: 140px;
+  padding: 10px 20px;
+}
+
 .game-page {
   width: 100%;
   display: flex;
