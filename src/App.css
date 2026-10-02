@@ -40,7 +40,7 @@
   background: rgba(0, 0, 0, 0.85);
 }
 
-.option-menu label {
+.options-menu label {
   gap: 8px;
   display: flex;
   font-size: 18px;

@@ -1,5 +1,12 @@
-import { useEffect, useEffectEvent, useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Application, Assets, Graphics, Sprite, } from 'pixi.js'
+import { useQuery } from "@tanstack/react-query"
+import {
+  getRanking,
+  getHistory,
+  saveMatch,
+} from './api/matches'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 
 import shipImage from '../assets/png/retina/ships/ship_1.png'
 import enemyShipImage from '../assets/png/retina/ships/ship_2.png'
@@ -28,11 +35,68 @@ function App() {
 
     return saved ? Number(saved) : 2000
   })
+  const [showRanking, setShowRanking] = useState(false)
+  const [showHistory, setShowHistory] = useState(false)
+
+  const rankingQuery = useQuery({
+    queryKey: ['ranking'],
+    queryFn: getRanking,
+    enabled: showRanking,
+  })
+
+  const historyQuery = useQuery({
+    queryKey: ['history'],
+    queryFn: getHistory,
+    enabled: showHistory,
+  })
+
+  const queryClient = useQueryClient()
+
+  const saveMatchMutation = useMutation({
+    mutationFn: saveMatch,
+
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['ranking'],
+      })
+
+      queryClient.invalidateQueries({
+        queryKey: ['history'],
+      })
+    },
+  })
+
+  const matchSavedRef = useRef(false)
 
   const gameOverRef = useRef(false)
   const isPausedRef = useRef(false)
   const gameStartedRef = useRef(false)
   const spawnInternalRef = useRef(spawnInternal)
+
+  useEffect(() => {
+    if (
+      !gameOver ||
+      !endReason ||
+      matchSavedRef.current
+    ) {
+      return
+    }
+
+    matchSavedRef.current = true
+
+    saveMatchMutation.mutate({
+      score,
+      duration: matchDuration - timeLeft,
+      result: endReason,
+      playedAt: new Date().toISOString(),
+    })
+  }, [
+    gameOver,
+    endReason,
+    score,
+    matchDuration,
+    timeLeft,
+  ])
 
   useEffect(() => {
     gameStartedRef.current = gameStarted
@@ -90,6 +154,30 @@ function App() {
 
     setShowOptions(false)
   }
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (
+        document.hidden &&
+        gameStarted &&
+        !gameOver
+      ) {
+        setIsPaused(true)
+      }
+    }
+
+    document.addEventListener(
+      'visibilitychange',
+      handleVisibilityChange,
+    )
+
+    return () => {
+      document.removeEventListener(
+        'visibilitychange',
+        handleVisibilityChange,
+      )
+    }
+  }, [gameStarted, gameOver])
 
   useEffect(() => {
     const app = new Application()
@@ -522,6 +610,8 @@ function App() {
 
             projectiles.splice(i, 1)
 
+            setScore((currentScore) => currentScore + 1)
+
             setTimeout(() => {
               shooter.x = 100 + Math.random() * (app.screen.width - 200)
 
@@ -628,17 +718,24 @@ function App() {
 
   return (
     <main className="game-page">
-      {!gameStarted && !showOptions && (
+      {!gameStarted && !showOptions && !showRanking && !showHistory && (
         <div className="main-menu">
           <h1>Pirate Battle</h1>
 
-          <button onClick={() => {
-            setHealth(100)
-            setScore(0)
-            setTimeLeft(matchDuration)
-            setGameOver(false)
-            setGameStarted(true)
-          }}>
+          <button
+            onClick={() => {
+              matchSavedRef.current = false
+
+              setHealth(100)
+              setScore(0)
+              setTimeLeft(matchDuration)
+
+              setEndReason(null)
+
+              setGameOver(false)
+              setGameStarted(true)
+            }}
+          >
             Play
           </button>
 
@@ -646,6 +743,14 @@ function App() {
             setShowOptions(true)
           }}>
             Options
+          </button>
+
+          <button onClick={() => setShowRanking(true)}>
+            Ranking
+          </button>
+
+          <button onClick={() => setShowHistory(true)}>
+            Match History
           </button>
         </div>
       )}
@@ -677,8 +782,56 @@ function App() {
           </label>
 
           <button onClick={saveOptions}>Save</button>
-          
+
           <button onClick={() => setShowOptions(false)}>Back</button>
+        </div>
+      )}
+
+      {showRanking && !gameStarted && (
+        <div className="options-menu">
+          <h2>Ranking</h2>
+
+          {rankingQuery.isLoading && <p>Loading...</p>}
+
+          {rankingQuery.isError && (
+            <p>Failed to load ranking.</p>
+          )}
+
+          {rankingQuery.data?.map((match, index) => (
+            <p key={match.id}>
+              #{index + 1} — Score: {match.score}
+            </p>
+          ))}
+
+          <button onClick={() => setShowRanking(false)}>
+            Back
+          </button>
+        </div>
+      )}
+
+      {showHistory && !gameStarted && (
+        <div className="options-menu">
+          <h2>Match History</h2>
+
+          {historyQuery.isLoading && <p>Loading...</p>}
+
+          {historyQuery.isError && (
+            <p>Failed to load history.</p>
+          )}
+
+          {historyQuery.data?.map((match) => (
+            <div key={match.id}>
+              <p>
+                Score: {match.score}
+                {' | '}
+                Result: {match.result}
+              </p>
+            </div>
+          ))}
+
+          <button onClick={() => setShowHistory(false)}>
+            Back
+          </button>
         </div>
       )}
 
