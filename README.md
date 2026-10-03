@@ -4,6 +4,10 @@ A 2D naval battle game developed as part of the Jungle Gaming Game Developer Cha
 
 The project was built with React, TypeScript and PixiJS, with mocked API integration using Axios, TanStack Query and MSW.
 
+## Live Demo
+
+https://pirate-battle-rho.vercel.app
+
 ## Features
 
 - Player ship movement and rotation
